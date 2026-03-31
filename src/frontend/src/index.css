@@ -1,0 +1,100 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("/assets/fonts/PlusJakartaSans.woff2") format("woff2");
+  font-weight: 300 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/assets/fonts/JetBrainsMono.woff2") format("woff2");
+  font-weight: 300 700;
+  font-display: swap;
+}
+
+@layer base {
+  :root {
+    --radius: 0.5rem;
+    /* Deep navy dark trading dashboard */
+    --background: 0.13 0.022 243;
+    --foreground: 0.93 0.018 240;
+    --card: 0.17 0.025 243;
+    --card-foreground: 0.93 0.018 240;
+    --popover: 0.2 0.028 243;
+    --popover-foreground: 0.93 0.018 240;
+    --primary: 0.72 0.175 155;
+    --primary-foreground: 0.13 0.022 243;
+    --secondary: 0.25 0.035 243;
+    --secondary-foreground: 0.93 0.018 240;
+    --muted: 0.22 0.03 243;
+    --muted-foreground: 0.62 0.038 240;
+    --accent: 0.28 0.038 243;
+    --accent-foreground: 0.93 0.018 240;
+    --destructive: 0.58 0.175 25;
+    --destructive-foreground: 0.93 0.018 240;
+    --border: 0.28 0.038 243;
+    --input: 0.22 0.03 243;
+    --ring: 0.72 0.175 155;
+    /* Custom semantic tokens */
+    --bullish: 0.72 0.175 155;
+    --bearish: 0.58 0.175 25;
+    --amber: 0.75 0.14 70;
+    --chart-1: 0.72 0.175 155;
+    --chart-2: 0.58 0.175 25;
+    --chart-3: 0.75 0.14 70;
+    --chart-4: 0.67 0.12 264;
+    --chart-5: 0.55 0.08 200;
+    --sidebar: 0.16 0.024 243;
+    --sidebar-foreground: 0.93 0.018 240;
+    --sidebar-primary: 0.72 0.175 155;
+    --sidebar-primary-foreground: 0.13 0.022 243;
+    --sidebar-accent: 0.25 0.035 243;
+    --sidebar-accent-foreground: 0.93 0.018 240;
+    --sidebar-border: 0.3 0.04 243;
+    --sidebar-ring: 0.72 0.175 155;
+  }
+
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+  }
+}
+
+/* Signal glow effects */
+.signal-up-glow {
+  filter: drop-shadow(0 0 20px oklch(0.72 0.175 155 / 0.6));
+}
+.signal-down-glow {
+  filter: drop-shadow(0 0 20px oklch(0.58 0.175 25 / 0.6));
+}
+.card-glow-green {
+  box-shadow: 0 0 0 1px oklch(0.72 0.175 155 / 0.25), 0 8px 32px
+    oklch(0.72 0.175 155 / 0.12);
+}
+.card-glow-red {
+  box-shadow: 0 0 0 1px oklch(0.58 0.175 25 / 0.25), 0 8px 32px
+    oklch(0.58 0.175 25 / 0.12);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: oklch(0.16 0.024 243);
+}
+::-webkit-scrollbar-thumb {
+  background: oklch(0.28 0.038 243);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.38 0.05 243);
+}

@@ -277,7 +277,7 @@ function ScanningPanel({
             Scanning {pair}
           </div>
           <div className="text-[11px] text-muted-foreground mt-1">
-            Waiting for a 2/2 confirmed SURESHOT...
+            Waiting for a 1/1 confirmed SURESHOT...
           </div>
           <div className="text-[10px] text-muted-foreground mt-0.5">
             17-indicator signal engine
@@ -759,7 +759,7 @@ export default function App() {
               </div>
               <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-purple-500/15 border border-purple-500/30 text-[10px] font-bold text-purple-400">
                 <ShieldCheck size={9} />
-                2x CONFIRMED
+                1x CONFIRMED
               </div>
               {lastUpdated && (
                 <span className="text-[10px] text-muted-foreground hidden sm:inline">
@@ -938,7 +938,7 @@ export default function App() {
                       >
                         <ShieldCheck size={13} className="text-purple-300" />
                         <span className="text-[11px] font-black tracking-widest text-purple-300 uppercase">
-                          {signal.passesConfirmed}/{signal.passesTotal ?? 5} AI
+                          {signal.passesConfirmed}/{signal.passesTotal ?? 1} AI
                           SCENARIOS CONFIRMED
                         </span>
                         <ShieldCheck size={13} className="text-purple-300" />
@@ -1128,7 +1128,7 @@ export default function App() {
                   className="rounded-xl border border-border bg-card p-8 text-center text-muted-foreground text-sm"
                   data-ocid="signal.empty_state"
                 >
-                  Click SCAN NOW to find a 2x confirmed SureShot signal
+                  Click SCAN NOW to find a 1x confirmed SureShot signal
                 </motion.div>
               )}
             </AnimatePresence>

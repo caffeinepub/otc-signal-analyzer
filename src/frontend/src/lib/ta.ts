@@ -1525,35 +1525,16 @@ export function generateSignalMultiPass(
   const minuteSeed = Math.floor(now.getTime() / 60000);
   const priceQuant = anchorPrice ? Math.round(anchorPrice * 10000) : 10842;
 
-  // Run 5 independent passes with different seeds
-  const passResults: SignalResult[] = [];
-  const priceHistories: number[][] = [];
+  // Single-pass confirmation: run 1 pass, must be STRONG
+  const seedOverride = minuteSeed * 31337 + priceQuant * 13;
+  const ph = generatePriceHistory(pair, 120, anchorPrice, seedOverride);
+  const result = generateSignal(pair, ph);
 
-  for (let pass = 0; pass < 5; pass++) {
-    const seedOverride =
-      (minuteSeed + pass * 7919) * 31337 + priceQuant * 13 + pass * 1000003;
-    const ph = generatePriceHistory(pair, 120, anchorPrice, seedOverride);
-    const result = generateSignal(pair, ph);
-    passResults.push(result);
-    priceHistories.push(ph);
-  }
-
-  // All 5 passes must agree on direction AND all 5 must be STRONG
-  const allAgree = passResults.every(
-    (r) => r.direction === passResults[0].direction,
-  );
-  const allStrong = passResults.every((r) => r.signalStrength === "STRONG");
-
-  if (!allAgree || !allStrong) return null;
-
-  // Use the pass with highest confluence score as the representative signal
-  const best = passResults.reduce((a, b) =>
-    (b.confluenceScore ?? 0) > (a.confluenceScore ?? 0) ? b : a,
-  );
-  const bestIdx = passResults.indexOf(best);
+  // Pass must reach STRONG consensus
+  if (result.signalStrength !== "STRONG") return null;
 
   return {
-    signal: { ...best, passesConfirmed: 5, passesTotal: 5 },
-    priceHistory: priceHistories[bestIdx],
+    signal: { ...result, passesConfirmed: 1, passesTotal: 1 },
+    priceHistory: ph,
   };
 }

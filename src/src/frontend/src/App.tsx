@@ -79,15 +79,7 @@ function formatPrice(price: number, pair = ""): string {
 // ─── Signal Strength Badge ───────────────────────────────────────────────────────
 function SignalStrengthBadge({
   strength,
-  ultraStrong,
-}: { strength: "STRONG" | "MODERATE" | "WEAK"; ultraStrong?: boolean }) {
-  if (ultraStrong) {
-    return (
-      <span className="inline-flex items-center gap-1 text-[11px] font-black px-2.5 py-1 rounded-lg bg-yellow-500/20 text-yellow-300 border border-yellow-400/50 tracking-wide animate-pulse">
-        🔥 ULTRA STRONG
-      </span>
-    );
-  }
+}: { strength: "STRONG" | "MODERATE" | "WEAK" }) {
   if (strength === "STRONG") {
     return (
       <span className="inline-flex items-center gap-1 text-[11px] font-black px-2.5 py-1 rounded-lg bg-bullish/20 text-bullish border border-bullish/40 tracking-wide">
@@ -277,10 +269,10 @@ function ScanningPanel({
             Scanning {pair}
           </div>
           <div className="text-[11px] text-muted-foreground mt-1">
-            Waiting for a 2/2 confirmed SURESHOT...
+            Waiting for a 3/3 confirmed SURESHOT...
           </div>
           <div className="text-[10px] text-muted-foreground mt-0.5">
-            17-indicator signal engine
+            All 3 AI scenarios must agree on direction
           </div>
         </div>
 
@@ -411,7 +403,7 @@ export default function App() {
         setAnalyzeProgress(prog);
       }, 40);
 
-      // Dual-pass takes slightly longer — give it adequate time
+      // Triple-pass takes slightly longer — give it adequate time
       await new Promise((r) => setTimeout(r, isScan ? 5 : 10));
 
       if (analyzeProgressRef.current) {
@@ -419,9 +411,11 @@ export default function App() {
       }
       setAnalyzeProgress(100);
 
+      // Triple-pass: all 3 scenarios must agree direction + 2/3 STRONG
       const passResult = generateSignalMultiPass(
         selectedPair,
         livePrice ?? undefined,
+        3,
       );
 
       setLastScannedAt(formatUTC530(new Date()));
@@ -429,7 +423,7 @@ export default function App() {
       if (passResult !== null) {
         const { signal: result, priceHistory: ph } = passResult;
 
-        // All 2 passes confirmed — display the signal
+        // All 3 passes confirmed — display the signal
         setIsAutoSignal(auto);
         setPrices(ph);
         setSignal(result);
@@ -566,7 +560,7 @@ export default function App() {
                 DeepSeek OTC AI
               </div>
               <div className="text-[10px] text-muted-foreground">
-                {selectedPair} · 17-Indicator Engine · Direct Signal
+                {selectedPair} · 17-Indicator Engine · 3x AI Confirmed
               </div>
             </div>
           </div>
@@ -759,7 +753,7 @@ export default function App() {
               </div>
               <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-purple-500/15 border border-purple-500/30 text-[10px] font-bold text-purple-400">
                 <ShieldCheck size={9} />
-                2x CONFIRMED
+                3x CONFIRMED
               </div>
               {lastUpdated && (
                 <span className="text-[10px] text-muted-foreground hidden sm:inline">
@@ -830,18 +824,18 @@ export default function App() {
                   </div>
                   <div className="text-center">
                     <div className="text-sm font-bold text-blue-300 mb-1">
-                      DEEPSEEK PRO AI · SIGNAL ANALYSIS
+                      DEEPSEEK PRO AI · 3x PASS ANALYSIS
                     </div>
                     <div className="text-[11px] text-muted-foreground">
-                      {`Running 17-indicator analysis on ${selectedPair}...`}
+                      {`Running 3 independent AI scenarios on ${selectedPair}...`}
                     </div>
                     <div className="text-[10px] text-muted-foreground mt-0.5">
-                      Generating sureshot signal...
+                      All 3 must agree to confirm a SURESHOT
                     </div>
                   </div>
                   <div className="w-full max-w-[220px] space-y-1">
                     <div className="flex justify-between text-[10px] text-muted-foreground">
-                      <span>Processing 17 indicators</span>
+                      <span>Processing 17 × 3 indicators</span>
                       <span className="font-mono">
                         {Math.round(analyzeProgress)}%
                       </span>
@@ -927,7 +921,7 @@ export default function App() {
                       </motion.span>
                     </motion.div>
 
-                    {/* 2/2 AI Confirmed badge */}
+                    {/* 3/3 AI Confirmed badge */}
                     {signal.passesConfirmed && (
                       <motion.div
                         initial={{ opacity: 0, scale: 0.9 }}
@@ -938,7 +932,7 @@ export default function App() {
                       >
                         <ShieldCheck size={13} className="text-purple-300" />
                         <span className="text-[11px] font-black tracking-widest text-purple-300 uppercase">
-                          {signal.passesConfirmed}/{signal.passesTotal ?? 5} AI
+                          {signal.passesConfirmed}/{signal.passesTotal ?? 3} AI
                           SCENARIOS CONFIRMED
                         </span>
                         <ShieldCheck size={13} className="text-purple-300" />
@@ -974,10 +968,7 @@ export default function App() {
                       >
                         {isUp ? "▲ CALL / BUY" : "▼ PUT / SELL"}
                       </div>
-                      <SignalStrengthBadge
-                        strength={signal.signalStrength}
-                        ultraStrong={signal.ultraStrong}
-                      />
+                      <SignalStrengthBadge strength={signal.signalStrength} />
                       {signal.patternLabel && (
                         <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-purple-500/15 text-purple-300 border border-purple-500/30 tracking-wide">
                           ❆ {signal.patternLabel}
@@ -1128,7 +1119,7 @@ export default function App() {
                   className="rounded-xl border border-border bg-card p-8 text-center text-muted-foreground text-sm"
                   data-ocid="signal.empty_state"
                 >
-                  Click SCAN NOW to find a 2x confirmed SureShot signal
+                  Click SCAN NOW to find a 3x confirmed SureShot signal
                 </motion.div>
               )}
             </AnimatePresence>
@@ -1311,15 +1302,15 @@ export default function App() {
                   <div className="space-y-2">
                     <Search size={24} className="mx-auto text-blue-400 mb-2" />
                     <p className="text-blue-300 font-bold text-xs">
-                      Running signal analysis...
+                      Running 3x AI scenario analysis...
                     </p>
                     <p className="text-[10px]">
-                      Generating next sureshot signal. Rescanning in{" "}
-                      {scanCountdown}s.
+                      All 3 AI scenarios must agree before a signal appears.
+                      Rescanning in {scanCountdown}s.
                     </p>
                   </div>
                 ) : (
-                  "Click SCAN NOW to generate a signal"
+                  "Click SCAN NOW to begin 3x AI analysis"
                 )}
               </div>
             )}
@@ -1371,7 +1362,8 @@ export default function App() {
                       className="text-center text-muted-foreground py-8"
                       data-ocid="history.empty_state"
                     >
-                      No sureshot signals yet — scanning now...
+                      No sureshot signals yet — running 3x AI scenario
+                      confirmation...
                     </TableCell>
                   </TableRow>
                 ) : (

@@ -1,8 +1,8 @@
-// Technical Analysis Engine — DeepSeek OTC AI v22 (Triple-Pass | 20 Indicators)
-// Uses 20 indicators + triple-pass confirmation gate:
+// Technical Analysis Engine — DeepSeek OTC AI v13 (Triple-Pass Confirmed)
+// Uses 17 indicators + triple-confirmation gate:
 // All 3 independent market scenarios must agree on direction AND
-// ALL must reach STRONG consensus (80%+ weighted) AND
-// at least 12/20 raw indicators must agree on the winning direction.
+// at least 2/3 must reach STRONG consensus (72%+ weighted) AND
+// at least 10/17 raw indicators must agree on the winning direction.
 
 export interface IndicatorResult {
   name: string;
@@ -27,7 +27,6 @@ export interface SignalResult {
   confluenceScore?: number; // 0-100
   passesConfirmed?: number; // how many passes agreed
   passesTotal?: number; // total passes run
-  ultraStrong?: boolean; // ratio >= 0.85 && 12/20 agree
 }
 
 // ─── Seeded RNG ────────────────────────────────────────────────────────────────
@@ -699,223 +698,6 @@ const fmtUTC530 = (d: Date) => {
   return `${hh}:${mm}:${ss} UTC-05:30`;
 };
 
-// ─── Hull Moving Average ───────────────────────────────────────────────────────
-function calcHullMA(
-  prices: number[],
-  period = 9,
-): { signal: "BUY" | "SELL" | "NEUTRAL"; desc: string } {
-  if (prices.length < period * 2)
-    return { signal: "NEUTRAL", desc: "Insufficient data" };
-  const wma = (arr: number[], n: number) => {
-    const w = arr.slice(-n);
-    const denom = (n * (n + 1)) / 2;
-    return w.reduce((acc, v, i) => acc + v * (i + 1), 0) / denom;
-  };
-  const half = Math.floor(period / 2);
-  const wmaFull = wma(prices, period);
-  const wmaHalf = wma(prices, half);
-  const hullRaw = 2 * wmaHalf - wmaFull;
-  const hullPrev2 =
-    prices.length >= period + 2
-      ? 2 * wma(prices.slice(0, -2), half) - wma(prices.slice(0, -2), period)
-      : hullRaw;
-  const slope = hullRaw - hullPrev2;
-  const last = prices[prices.length - 1];
-  if (slope > 0 && last > hullRaw)
-    return {
-      signal: "BUY",
-      desc: `HMA rising slope — bullish (HMA:${hullRaw.toFixed(4)})`,
-    };
-  if (slope < 0 && last < hullRaw)
-    return {
-      signal: "SELL",
-      desc: `HMA falling slope — bearish (HMA:${hullRaw.toFixed(4)})`,
-    };
-  if (slope > 0)
-    return { signal: "BUY", desc: `HMA bullish bias (${hullRaw.toFixed(4)})` };
-  if (slope < 0)
-    return { signal: "SELL", desc: `HMA bearish bias (${hullRaw.toFixed(4)})` };
-  return { signal: "NEUTRAL", desc: `HMA flat (${hullRaw.toFixed(4)})` };
-}
-
-// ─── Money Flow Index (volume-proxy) ─────────────────────────────────────────
-function calcMFI(
-  prices: number[],
-  period = 14,
-): { signal: "BUY" | "SELL" | "NEUTRAL"; desc: string } {
-  if (prices.length < period + 2)
-    return { signal: "NEUTRAL", desc: "Insufficient data" };
-  const slice = prices.slice(-(period + 1));
-  let posFlow = 0;
-  let negFlow = 0;
-  for (let i = 1; i < slice.length; i++) {
-    const tp = slice[i];
-    const prevTp = slice[i - 1];
-    const flow = Math.abs(tp - prevTp) * tp;
-    if (tp > prevTp) posFlow += flow;
-    else if (tp < prevTp) negFlow += flow;
-  }
-  if (negFlow === 0)
-    return { signal: "BUY", desc: "MFI: pure buying pressure" };
-  const mfRatio = posFlow / negFlow;
-  const mfi = 100 - 100 / (1 + mfRatio);
-  if (mfi < 20)
-    return {
-      signal: "BUY",
-      desc: `MFI oversold (${mfi.toFixed(1)}) — reversal likely`,
-    };
-  if (mfi > 80)
-    return {
-      signal: "SELL",
-      desc: `MFI overbought (${mfi.toFixed(1)}) — reversal likely`,
-    };
-  if (mfi < 35)
-    return {
-      signal: "BUY",
-      desc: `MFI approaching oversold (${mfi.toFixed(1)})`,
-    };
-  if (mfi > 65)
-    return {
-      signal: "SELL",
-      desc: `MFI approaching overbought (${mfi.toFixed(1)})`,
-    };
-  if (mfi > 52)
-    return { signal: "BUY", desc: `MFI bullish zone (${mfi.toFixed(1)})` };
-  if (mfi < 48)
-    return { signal: "SELL", desc: `MFI bearish zone (${mfi.toFixed(1)})` };
-  return { signal: "NEUTRAL", desc: `MFI neutral (${mfi.toFixed(1)})` };
-}
-
-// ─── Detrended Price Oscillator (DPO) ─────────────────────────────────────────
-function calcDPO(
-  prices: number[],
-  period = 20,
-): { signal: "BUY" | "SELL" | "NEUTRAL"; desc: string } {
-  if (prices.length < period + 2)
-    return { signal: "NEUTRAL", desc: "Insufficient data" };
-  const shift = Math.floor(period / 2) + 1;
-  const emaArr = calcEMA(prices, period);
-  const emaShifted = emaArr[emaArr.length - 1 - shift] ?? emaArr[0];
-  const last = prices[prices.length - 1];
-  const dpo = last - emaShifted;
-  const atr = calcATR(prices, 14);
-  const threshold = atr * 0.5;
-  if (dpo > threshold)
-    return {
-      signal: "BUY",
-      desc: `DPO cycle high (${dpo.toFixed(5)}) — bullish cycle`,
-    };
-  if (dpo < -threshold)
-    return {
-      signal: "SELL",
-      desc: `DPO cycle low (${dpo.toFixed(5)}) — bearish cycle`,
-    };
-  if (dpo > 0)
-    return { signal: "BUY", desc: `DPO above zero (${dpo.toFixed(5)})` };
-  if (dpo < 0)
-    return { signal: "SELL", desc: `DPO below zero (${dpo.toFixed(5)})` };
-  return { signal: "NEUTRAL", desc: `DPO at zero (${dpo.toFixed(5)})` };
-}
-
-// ─── Elder Ray Index ───────────────────────────────────────────────────────────
-function calcElderRay(
-  prices: number[],
-  period = 13,
-): { signal: "BUY" | "SELL" | "NEUTRAL"; desc: string } {
-  if (prices.length < period + 2)
-    return { signal: "NEUTRAL", desc: "Insufficient data" };
-  const emaArr = calcEMA(prices, period);
-  const emaVal = emaArr[emaArr.length - 1];
-  const last = prices[prices.length - 1];
-  const slice = prices.slice(-3);
-  const high = Math.max(...slice) * 1.0003;
-  const low = Math.min(...slice) * 0.9997;
-  const bullPower = high - emaVal;
-  const bearPower = low - emaVal;
-  const atr = calcATR(prices, 14);
-  const scale = atr > 0 ? atr : 0.0001;
-  if (bullPower > 0 && bearPower > 0)
-    return {
-      signal: "BUY",
-      desc: `Elder: strong bull (BP:${(bullPower / scale).toFixed(2)})`,
-    };
-  if (bullPower < 0 && bearPower < 0)
-    return {
-      signal: "SELL",
-      desc: `Elder: strong bear (BP:${(bearPower / scale).toFixed(2)})`,
-    };
-  if (bullPower > 0 && bearPower < 0 && last > emaVal)
-    return {
-      signal: "BUY",
-      desc: `Elder: bull above EMA (${last.toFixed(4)})`,
-    };
-  if (bullPower < 0 && bearPower < 0 && last < emaVal)
-    return {
-      signal: "SELL",
-      desc: `Elder: bear below EMA (${last.toFixed(4)})`,
-    };
-  if (last > emaVal)
-    return {
-      signal: "BUY",
-      desc: `Elder: price above EMA${period} (${emaVal.toFixed(4)})`,
-    };
-  return {
-    signal: "SELL",
-    desc: `Elder: price below EMA${period} (${emaVal.toFixed(4)})`,
-  };
-}
-
-// ─── Keltner Channel ──────────────────────────────────────────────────────────
-function calcKeltnerChannel(
-  prices: number[],
-  period = 20,
-  multiplier = 1.5,
-): { signal: "BUY" | "SELL" | "NEUTRAL"; desc: string } {
-  if (prices.length < period + 2)
-    return { signal: "NEUTRAL", desc: "Insufficient data" };
-  const emaArr = calcEMA(prices, period);
-  const middle = emaArr[emaArr.length - 1];
-  const atr = calcATR(prices, period);
-  const upper = middle + multiplier * atr;
-  const lower = middle - multiplier * atr;
-  const last = prices[prices.length - 1];
-  const position = atr > 0 ? (last - middle) / (multiplier * atr) : 0;
-  if (last < lower)
-    return {
-      signal: "BUY",
-      desc: `Below Keltner lower (${lower.toFixed(4)}) — oversold`,
-    };
-  if (last > upper)
-    return {
-      signal: "SELL",
-      desc: `Above Keltner upper (${upper.toFixed(4)}) — overbought`,
-    };
-  if (position < -0.5)
-    return {
-      signal: "BUY",
-      desc: `Near Keltner lower band (pos:${position.toFixed(2)})`,
-    };
-  if (position > 0.5)
-    return {
-      signal: "SELL",
-      desc: `Near Keltner upper band (pos:${position.toFixed(2)})`,
-    };
-  if (position > 0.1)
-    return {
-      signal: "BUY",
-      desc: `Keltner mid-upper zone (${position.toFixed(2)})`,
-    };
-  if (position < -0.1)
-    return {
-      signal: "SELL",
-      desc: `Keltner mid-lower zone (${position.toFixed(2)})`,
-    };
-  return {
-    signal: "NEUTRAL",
-    desc: `Keltner mid-channel (${position.toFixed(2)})`,
-  };
-}
-
 // ─── Main Signal Generator ─────────────────────────────────────────────────────
 export function generateSignal(
   pair: string,
@@ -947,11 +729,6 @@ export function generateSignal(
   const rsiDiv = calcRSIDivergence(prices);
   const psarResult = calcParabolicSAR(prices);
   const fibResult = calcFibLevels(prices);
-  const hullMA = calcHullMA(prices, 9);
-  const mfi = calcMFI(prices, 14);
-  const keltner = calcKeltnerChannel(prices, 20, 1.5);
-  const dpo = calcDPO(prices, 20);
-  const elderRay = calcElderRay(prices, 13);
   const atr = calcATR(prices, 14);
   const isHighVolatility =
     prices.length > 0 && atr > 0.001 * prices[prices.length - 1];
@@ -1353,41 +1130,6 @@ export function generateSignal(
       description: fibResult.desc,
       weight: 1.6,
     },
-    {
-      name: "Hull MA (9)",
-      value: 0,
-      signal: hullMA.signal,
-      description: hullMA.desc,
-      weight: isTrending ? 2.0 : 1.4,
-    },
-    {
-      name: "Money Flow Index",
-      value: 0,
-      signal: mfi.signal,
-      description: mfi.desc,
-      weight: 1.5 * oscillatorScale,
-    },
-    {
-      name: "Keltner Channel",
-      value: 0,
-      signal: keltner.signal,
-      description: keltner.desc,
-      weight: isTrending ? 1.2 : 1.8,
-    },
-    {
-      name: "DPO Cycle (20)",
-      value: 0,
-      signal: dpo.signal,
-      description: dpo.desc,
-      weight: 1.3,
-    },
-    {
-      name: "Elder Ray Index",
-      value: 0,
-      signal: elderRay.signal,
-      description: elderRay.desc,
-      weight: isTrending ? 1.6 : 1.2,
-    },
   ];
 
   // ── Weighted Voting ────────────────────────────────────────────────────────
@@ -1459,32 +1201,17 @@ export function generateSignal(
   // ── Consensus Gate ────────────────────────────────────────────────────────
   const ratio = Math.max(finalRatio, 1 - finalRatio);
 
-  // Minimum raw indicator count: at least 12/20 must agree on winning direction
+  // Minimum raw indicator count: at least 10/17 must agree on winning direction
   const winningRawCount = Math.max(bullishCount, bearishCount);
-  const minRawVotesMet = winningRawCount >= 13;
+  const minRawVotesMet = winningRawCount >= 10;
 
-  // Consensus veto: if 3+ of the 4 key leading indicators disagree, block to WEAK
-  const keyLeadingSignals = [
-    macdSignal,
-    emaSignal,
-    mtfTrend.signal,
-    psarResult.signal,
-  ];
-  const keyAgree = keyLeadingSignals.filter(
-    (s) =>
-      (direction === "UP" && s === "BUY") ||
-      (direction === "DOWN" && s === "SELL"),
-  ).length;
-  const consensusVetoed = 4 - keyAgree >= 3;
-
-  // STRONG requires: 78%+ weighted consensus AND 12/20 raw indicators agree AND no consensus veto
+  // STRONG requires: 72%+ weighted consensus AND 10/17 raw indicators agree
   const signalStrength: "STRONG" | "MODERATE" | "WEAK" =
-    !consensusVetoed && ratio >= 0.8 && minRawVotesMet
+    ratio >= 0.72 && minRawVotesMet
       ? "STRONG"
-      : ratio >= 0.65
+      : ratio >= 0.62
         ? "MODERATE"
         : "WEAK";
-  const ultraStrong = !consensusVetoed && ratio >= 0.88 && minRawVotesMet;
 
   // Update signal persistence state
   lastSignalDirection = direction;
@@ -1504,56 +1231,72 @@ export function generateSignal(
     expiryTime: fmtUTC530(expiry),
     momentum,
     signalStrength,
-    ultraStrong,
     patternLabel: pattern.label || undefined,
     confluenceScore,
   };
 }
 
-// ─── Triple-Pass Confirmation ──────────────────────────────────────────────────
-// Generates 2 independent price scenarios using different seeds but the same
-// live anchor price. A signal is only returned when BOTH passes agree on
-// direction AND BOTH are STRONG (72%+ weighted, 10/17 raw).
+// ─── Triple-Pass Confirmation ─────────────────────────────────────────────────
+// Generates 3 independent price scenarios using different seeds but the same
+// live anchor price. A signal is only returned when ALL 3 passes agree on
+// direction AND at least 2/3 are STRONG (72%+ weighted, 10/17 raw).
 // Within the same minute, seeds are deterministic — signals are stable.
 
 export function generateSignalMultiPass(
   pair: string,
   anchorPrice?: number,
-  _passes = 3,
+  passes = 3,
 ): { signal: SignalResult; priceHistory: number[] } | null {
   const now = new Date();
+  // Minute-based seed ensures stability within same candle period
   const minuteSeed = Math.floor(now.getTime() / 60000);
+  // Price quantized to 4 decimal places for seed variation on price updates
   const priceQuant = anchorPrice ? Math.round(anchorPrice * 10000) : 10842;
 
-  // Run 5 independent passes with different seeds
-  const passResults: SignalResult[] = [];
-  const priceHistories: number[][] = [];
+  const PASS_PRIMES = [31337, 73939, 179426];
 
-  for (let pass = 0; pass < 5; pass++) {
+  const results: SignalResult[] = [];
+  const histories: number[][] = [];
+
+  for (let i = 0; i < passes; i++) {
     const seedOverride =
-      (minuteSeed + pass * 7919) * 31337 + priceQuant * 13 + pass * 1000003;
+      minuteSeed * PASS_PRIMES[i % PASS_PRIMES.length] +
+      priceQuant * 13 +
+      i * 7919;
     const ph = generatePriceHistory(pair, 120, anchorPrice, seedOverride);
     const result = generateSignal(pair, ph);
-    passResults.push(result);
-    priceHistories.push(ph);
+    results.push(result);
+    histories.push(ph);
   }
 
-  // All 5 passes must agree on direction AND all 5 must be STRONG
-  const allAgree = passResults.every(
-    (r) => r.direction === passResults[0].direction,
-  );
-  const allStrong = passResults.every((r) => r.signalStrength === "STRONG");
+  // All passes must agree on direction
+  const directions = results.map((r) => r.direction);
+  const allAgreeDir = directions.every((d) => d === directions[0]);
+  if (!allAgreeDir) return null;
 
-  if (!allAgree || !allStrong) return null;
+  // At least 2/3 must be STRONG
+  const strongCount = results.filter(
+    (r) => r.signalStrength === "STRONG",
+  ).length;
+  if (strongCount < Math.ceil(passes * 0.67)) return null;
 
-  // Use the pass with highest confluence score as the representative signal
-  const best = passResults.reduce((a, b) =>
-    (b.confluenceScore ?? 0) > (a.confluenceScore ?? 0) ? b : a,
-  );
-  const bestIdx = passResults.indexOf(best);
+  // Pick the result with the highest confluence score
+  let bestIdx = 0;
+  for (let i = 1; i < results.length; i++) {
+    if (
+      (results[i].confluenceScore ?? 0) >
+      (results[bestIdx].confluenceScore ?? 0)
+    ) {
+      bestIdx = i;
+    }
+  }
 
   return {
-    signal: { ...best, passesConfirmed: 5, passesTotal: 5 },
-    priceHistory: priceHistories[bestIdx],
+    signal: {
+      ...results[bestIdx],
+      passesConfirmed: passes,
+      passesTotal: passes,
+    },
+    priceHistory: histories[bestIdx],
   };
 }

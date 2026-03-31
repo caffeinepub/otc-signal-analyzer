@@ -1,27 +1,31 @@
-# OTC Signal Analyzer — Version 11
+# OTC Signal Analyzer
 
 ## Current State
-Version 10 uses 14 indicators with weighted voting. Signals are generated even when consensus is low (50-60%), leading to weaker signals. No divergence detection, no signal quality gate.
+Version 21 runs a single-pass signal engine with 17 indicators, STRONG threshold at 72% weighted + 10/17 raw, no confirmation passes. Signal fires on first analysis pass.
 
 ## Requested Changes (Diff)
 
 ### Add
-- RSI divergence detection (bullish/bearish divergence is one of strongest reversal signals)
-- Triple-confirmation gate: SURESHOT only fires when MACD + EMA + MTF all agree with direction
-- Minimum consensus threshold: 65%+ for STRONG, skip signal (show WAIT) if < 55%
-- Volume pressure scoring using price momentum consistency over last 5 bars
-- VETO: if MTF Confluence opposes signal direction, cut its weight boost to prevent false signals
+- 3 new indicators: Hull Moving Average (HMA), Money Flow Index (MFI), Keltner Channel — total 20 indicators
+- Triple-pass confirmation: 3 independent price scenario seeds must ALL agree on direction AND ALL reach STRONG consensus
+- "ULTRA STRONG" label for 85%+ confluence signals
+- Consensus veto: if 3+ key leading indicators (MACD, EMA Stack, MTF, Parabolic SAR) disagree with majority direction, block signal
+- ATR extreme-volatility guard: during abnormal volatility, require 82%+ threshold
 
 ### Modify
-- Signal strength: STRONG requires 68%+ weighted consensus (was 72% ratio but on full range)
-- Price history: smoother trend cycles with more realistic reversals for better indicator readings
-- Weighted voting: give extra 30% boost when MACD + EMA + MTF all align with direction
-- Auto-signal on candle: only fire if signalStrength is STRONG or MODERATE (suppress WEAK auto-signals)
+- STRONG threshold raised: 78%+ weighted consensus AND 12/20 raw indicators must agree (up from 72% + 10/17)
+- Triple-pass confirmation replaces single-pass — all 3 must agree and all 3 must reach STRONG
+- generateSignalMultiPass now runs 3 passes by default
+- Indicator weights rebalanced for higher precision
 
 ### Remove
-- Nothing removed
+- Nothing removed — all existing indicators preserved
 
 ## Implementation Plan
-1. Update ta.ts: add calcRSIDivergence(), improve generatePriceHistory(), add triple-confirm gate
-2. Update App.tsx: suppress auto SURESHOT if signal is WEAK (show waiting state instead)
-3. Show RSI divergence as a new named indicator in the breakdown panel
+1. Add calcHullMA(), calcMFI(), calcKeltnerChannel() to ta.ts
+2. Add these 3 as indicator entries with appropriate weights
+3. Raise STRONG gate to 78% + 12/20
+4. Add ULTRA_STRONG detection at 85%+ and include in SignalResult
+5. Update generateSignalMultiPass to run 3 independent passes, all must be STRONG and agree
+6. Add consensus veto logic for MACD+EMA+MTF+PSAR disagreement
+7. Update App.tsx signal strength badge to show ULTRA STRONG variant
